@@ -56,9 +56,9 @@ python coco_to_yolo -i ./ClearSAR/coco_dataset -o ./ClearSAR/yolo_dataset --val_
 ```
 ### Run yolo
 
-1. chnage dataset paths in: 
+1. change dataset paths in: 
 ```configs/yolo_train.yaml```
-```configs/yolo_train.yaml```
+```/home/simone/myprojects/ClearSAR/ClearSAR/yolo_dataset/data.yaml```
 2. run:
 ```
 python yolo.py --mode "train" --config configs/yolo_train.yaml

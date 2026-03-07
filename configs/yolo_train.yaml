@@ -1,12 +1,12 @@
 # Specifies the model file for training. Accepts a path to a .pt pretrained model.
 # Type: str
 # Allowed values: Any valid file path
-model: yolo26x.pt
+model: yolo26m.pt
 
 # Path to the dataset configuration file (e.g., coco8.yaml). Contains dataset-specific parameters.
 # Type: str
 # Allowed values: Any valid file path
-data: /home/simone/myprojects/ClearSAR/ClearSAR/yolo_dataset/dataset.yaml
+data: /home/simone/myprojects/ClearSAR/ClearSAR/yolo_dataset/data.yaml
 
 # Total number of training epochs. Each epoch represents a full pass over the entire dataset.
 # Type: int
@@ -73,7 +73,7 @@ project: experiments
 # Name of the training run. Used for creating a subdirectory within the project folder.
 # Type: str
 # Allowed values: Any valid string
-name: yolo26x_run
+name: yolo26m_run
 
 # If true, allows overwriting of an existing project/name directory.
 # Type: bool
@@ -281,7 +281,7 @@ hsv_v: 0.5
 # Type: float
 # Default: 0.0
 # Range: [-180 to 180]
-degrees: 45.0
+degrees: 0.0
 
 # Translates the image horizontally and vertically.
 # Type: float

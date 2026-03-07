@@ -82,6 +82,32 @@ def inference(config_file_path: str) -> None:
     # Perform inference with the model
     results = model.predict(**inference_args)
 
+    # ---------------
+
+    # Convert predictions to COCO detection format
+    #detections = []
+    #for result in results:
+    #    # Extract image_id from the filename stem (e.g. "1260.png" → 1260)
+    #    image_id = int(Path(result.path).stem)
+    #
+    #    boxes  = result.boxes.xyxy.cpu()   # [x_min, y_min, x_max, y_max]
+    #    scores = result.boxes.conf.cpu()
+    #    for box, score in zip(boxes, scores):
+    #        x_min, y_min, x_max, y_max = box
+    #        # Convert to COCO [x, y, w, h] format
+    #        coco_box = [x_min, y_min, x_max - x_min, y_max - y_min]
+    #        detections.append({
+    #            "image_id": image_id,
+    #            "category_id": 1,
+    #            "bbox": list(map(float, coco_box)),
+    #            "score": float(score),
+    #        })
+    #
+    #with open(output_path, "w") as f:
+    #    json.dump(detections, f)
+    #
+    #print(f"Saved {len(detections)} detections to {output_path}")
+
 
 
 def to_subsmission():

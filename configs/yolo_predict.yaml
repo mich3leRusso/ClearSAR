@@ -1,0 +1,130 @@
+# Inference Configuration
+
+# str: Inference task
+# Specifies which task the yolo model should execute
+# Range: ['detect', 'segment']
+task: detect
+
+# str: Path to the model checkpoint file.
+# Specifies the .pt file for the model to be used during inference.
+model: /home/simone/myprojects/ClearSAR/runs/detect/experiments/yolo26m_run/weights/best.pt
+
+# str: Data source for inference.
+# Can be an image path, video file, directory of images, directory of videos or youtube URL.
+source: /home/simone/myprojects/ClearSAR/ClearSAR/yolo_dataset/images/test
+
+# float: Confidence threshold for detection filtering.
+# Detections with a confidence score below this value will be discarded.
+# Range: (0.0, 1.0]
+conf: 0.3
+
+# float: IoU threshold for Non-Maximum Suppression (NMS).
+# Helps reduce duplicate detections by suppressing overlapping boxes.
+# Range: (0.0, 1.0]
+iou: 0.5
+
+# int: Image/video size during inference.
+# All images/videos will be resized to this height before being given to the model (doesn't affect output image/video size).
+# Range: Any positive integer >= 32.
+imgsz: 640
+
+# bool: Enable half-precision (FP16) inference.
+# Can increase inference speed on supported GPUs with minimal accuracy loss.
+half: false
+
+# int or str: Device to be used for evaluation.
+# Allows selection between CPU and GPU resources.
+# Range int: any non-negative integer
+# Range str: ['cpu', 'mps']
+device: 0
+
+# int: Batch size for inference.
+# Range: any positive integer.
+batch: 16
+
+# int: Maximum number of detections per image.
+# Limits the total number of objects that can be detected in a single image.
+# Range: Any positive integer.
+max_det: 300
+
+# int: Frame stride for video inputs.
+# Allows skipping frames to speed up inference. Higher values skip more frames.
+# Range: Any positive integer.
+vid_stride: 1
+
+# bool: Use stream buffering for video streams.
+# If true, queues new frames to avoid dropping frames but may cause latency.
+stream_buffer: false
+
+# bool: Visualize model features during inference.
+# Activates feature maps visualization for model interpretability or debugging.
+visualize: false
+
+# bool: Enable test-time augmentation (TTA) during inference.
+# Improves detection robustness by augmenting inputs, at the cost of slower inference.
+augment: true
+
+# bool: Enable class-agnostic Non-Maximum Suppression (NMS).
+# Treats all classes equally during NMS, merging overlapping boxes regardless of class.
+agnostic_nms: false
+
+# null or list[int]: Filter detections by specific class IDs.
+# Only predictions belonging to the specified class IDs will be returned.
+classes: null
+
+# bool: Use high-resolution segmentation masks if available.
+# Provides higher quality segmentation outputs when supported by the model.
+retina_masks: false
+
+# null or list[int]: Extract feature vectors from specified layers.
+# Useful for applications such as clustering or similarity search.
+embed: null
+
+# str: Path to directory where to save the experiments.
+# Specifies the directory where inference results will be saved.
+project: experiments
+
+# str: Subfolder name for this inference run.
+# Defines the subdirectory under the project folder for saving results.
+name: yolo26m_run
+
+# bool: Display annotated images or videos in a window.
+# Provides immediate visual feedback during inference.
+show: false
+
+# bool: Save annotated images or videos to a file.
+# Allows saving the output with detected objects for later analysis or sharing.
+save: true
+
+# bool: Save individual frames when processing videos.
+# Useful for frame-by-frame analysis or extracting specific frames.
+save_frames: false
+
+# bool: Save detection results in a text file.
+# Format: [class] [x_center] [y_center] [width] [height] [confidence].
+save_txt: true
+
+# bool: Save confidence scores in the text output file.
+# Adds confidence values to each detection result for more detailed analysis.
+save_conf: true
+
+# bool: Save cropped images of detected objects.
+# Crops and saves individual detections, useful for dataset augmentation or analysis.
+save_crop: false
+
+# bool: Display labels for each detected object.
+# Provides class labels alongside detected objects for better understanding.
+show_labels: false
+
+# bool: Display confidence scores for each detected object.
+# Shows the model's confidence for each prediction, giving insight into detection certainty.
+show_conf: false
+
+# bool: Draw bounding boxes around detected objects.
+# Essential for visualizing where objects are located in the image or video frame.
+show_boxes: false
+
+# null or int: Line width for bounding boxes.
+# If null, the line width is automatically adjusted based on image size.
+# Range: null or any positive integer.
+line_width: null
