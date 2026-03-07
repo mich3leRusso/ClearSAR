@@ -43,3 +43,23 @@ Download the dataset:
 ```
 eotdl datasets get ClearSAR -v 1 --assets -p <path-installation>
 ```
+
+## YOLO:
+
+### Dataset setup
+1. rename the old dataset such that the path is: 
+```./ClearSAR/coco_dataset/annotations```
+```./ClearSAR/coco_dataset/images```
+2. run:
+```
+python coco_to_yolo -i ./ClearSAR/coco_dataset -o ./ClearSAR/yolo_dataset --val_split 0.2
+```
+### Run yolo
+
+1. chnage dataset paths in: 
+```configs/yolo_train.yaml```
+```configs/yolo_train.yaml```
+2. run:
+```
+python yolo.py --mode "train" --config configs/yolo_train.yaml
+```

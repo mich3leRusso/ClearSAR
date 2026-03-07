@@ -82,14 +82,7 @@ def inference(config_file_path: str) -> None:
     # Perform inference with the model
     results = model.predict(**inference_args)
 
-    if inference_args["stream"]:
-        print("saving with stream")
-        # iterate through generator to trigger saving of results
-        for r in results:
-            pass
 
-def from_coco():
-    pass
 
 def to_subsmission():
     pass

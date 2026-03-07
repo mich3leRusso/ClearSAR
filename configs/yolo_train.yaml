@@ -6,13 +6,13 @@ model: yolo26x.pt
 # Path to the dataset configuration file (e.g., coco8.yaml). Contains dataset-specific parameters.
 # Type: str
 # Allowed values: Any valid file path
-data: ./data/data.yaml
+data: /home/simone/myprojects/ClearSAR/ClearSAR/yolo_dataset/dataset.yaml
 
 # Total number of training epochs. Each epoch represents a full pass over the entire dataset.
 # Type: int
 # Default: 100
 # Allowed values: >= 1
-epochs: 500
+epochs: 300
 
 # Maximum training time in hours. Overrides the epochs argument if set.
 # Type: float
@@ -57,7 +57,7 @@ cache: false
 # Specifies the computational device(s) for training: GPU, CPU, or MPS.
 # Type: int, str, or list
 # Allowed values: int >=0 ,list[int] >=0 , str in  ['cpu', 'mps']
-device: [0,1,2,3]
+device: 0
 
 # Number of worker threads for data loading.
 # Type: int
@@ -73,7 +73,7 @@ project: experiments
 # Name of the training run. Used for creating a subdirectory within the project folder.
 # Type: str
 # Allowed values: Any valid string
-name: custom_dataset_yolo11x
+name: yolo26x_run
 
 # If true, allows overwriting of an existing project/name directory.
 # Type: bool
@@ -158,13 +158,13 @@ freeze: null
 # Type: float
 # Default: 0.01
 # Allowed values: >0
-lr0: 0.01
+lr0: 0.001
 
 # Final learning rate as a fraction of the initial rate.
 # Type: float
 # Default: 0.01
 # Allowed values: >0
-lrf: 0.001
+lrf: 0.01
 
 # Momentum factor for SGD or beta1 for Adam optimizers.
 # Type: float
@@ -263,19 +263,19 @@ plots: true
 # Type: float
 # Default: 0.015
 # Range: [0.0 - 1.0]
-hsv_h: 0.015
+hsv_h: 0.0
 
 # Alters the saturation of the image.
 # Type: float
 # Default: 0.7
 # Range: [0.0 - 1.0]
-hsv_s: 0.7
+hsv_s: 0.5
 
 # Modifies the value (brightness) of the image.
 # Type: float
 # Default: 0.4
 # Range: [0.0 - 1.0]
-hsv_v: 0.6
+hsv_v: 0.5
 
 # Rotates the image randomly within the specified degree range.
 # Type: float
@@ -359,7 +359,7 @@ auto_augment: 'randaugment'
 # Type: float
 # Default: 0.4
 # Range: [0.0 - 0.9]
-erasing: 0.3
+erasing: 0.0
 
 # Crops the classification image to a fraction of its size.
 # Type: float
