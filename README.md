@@ -63,3 +63,11 @@ python coco_to_yolo -i ./ClearSAR/coco_dataset -o ./ClearSAR/yolo_dataset --val_
 ```
 python yolo.py --mode "train" --config configs/yolo_train.yaml
 ```
+
+## RF-DETR
+1. rehsape yolo dataset to train/images+labels and valid/images+labels (test is optinal)
+2. check paths
+
+```
+python rf-detr.py 
+```

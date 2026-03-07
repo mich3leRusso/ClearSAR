@@ -1,0 +1,44 @@
+# Specifies the COCO-formatted dataset location with train, valid, and test folders, each containing _annotations.coco.json. Ensures the model can properly read and parse data.
+dataset_dir: "/home/simone/myprojects/ClearSAR/ClearSAR/rfdetr_dataset"
+# Directory where training artifacts (checkpoints, logs, etc.) are saved. Important for experiment tracking and resuming training.
+output_dir: "runs/frdetr"
+# Number of full passes over the dataset. Increasing this can improve performance but extends total training time.
+epochs: 300
+# Number of samples processed per iteration. Higher values require more GPU memory but can speed up training. Must be balanced with grad_accum_steps to maintain the intended total batch size.
+batch_size: 4
+# Accumulates gradients over multiple mini-batches, effectively raising the total batch size without requiring as much memory at once. Helps train on smaller GPUs at the cost of slightly more time per update.
+grad_accum_steps: 4
+# Path to a saved checkpoint to continue training. Restores model weights, optimizer state, and scheduler.
+resume: null
+# Learning rate for most parts of the model. Influences how quickly or cautiously the model adjusts its parameters.
+lr: 1.0e-4
+# Learning rate specifically for the encoder portion of the model. Useful for fine-tuning encoder layers at a different pace.
+lr_encoder: 1.5e-4
+# Sets the input image dimensions. Higher values can improve accuracy but require more memory and can slow training. Must be divisible by 56. (560, 672, 784)
+resolution: 672
+# Coefficient for L2 regularization. Helps prevent overfitting by penalizing large weights, often improving generalization.
+weight_decay: 1.0e-4
+# Specifies the hardware (e.g., cpu or cuda) to run training on. GPU significantly speeds up training.
+device: cuda
+# Re-computes parts of the forward pass during backpropagation to reduce memory usage. Lowers memory needs but increases training time.
+use_ema: true
+# Re-computes parts of the forward pass during backpropagation to reduce memory usage. Lowers memory needs but increases training time.
+gradient_checkpointing: false
+# Frequency (in epochs) at which model checkpoints are saved. More frequent saves provide better coverage but consume more storage.
+checkpoint_interval: 20
+# Enables logging of training metrics to TensorBoard for monitoring progress and performance.
+tensorboard: true
+# Activates logging to Weights & Biases, facilitating cloud-based experiment tracking and visualization.
+wandb: false
+# Project name for Weights & Biases logging. Groups multiple runs under a single heading.
+project: rfdetr
+# Run name for Weights & Biases logging, helping differentiate individual training sessions within a project.
+run: rfdetr
+# Enables an early stopping callback that monitors mAP improvements to decide if training should be stopped. Helps avoid needless epochs when mAP plateaus.
+early_stopping: true
+# Number of consecutive epochs without mAP improvement before stopping. Prevents wasting resources on minimal gains.
+early_stopping_patience: 30
+# Minimum change in mAP to qualify as an improvement. Ensures that trivial gains don’t reset the early stopping counter.
+early_stopping_min_delta: 0.001
+# Whether to track improvements using the EMA version of the model. Uses EMA metrics if available, otherwise falls back to regular mAP.
+early_stopping_use_ema: false
