@@ -1,0 +1,8 @@
+import pandas as pd
+import geopandas as gpd
+
+gdf = gpd.read_parquet("CLEARSAR/ClearSAR/catalog.parquet")
+print(gdf.crs)         # coordinate reference system
+print(gdf.geometry)    # spatial geometry column
+gdf.plot()             # quick visual of the coverage area
+
