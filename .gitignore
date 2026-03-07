@@ -13,6 +13,15 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+.history/
+ClearSAR/
+configs/
+*.json
+*.png
+*.toml
+.python-version
+*.packaging
+*.lock
 .Python
 build/
 develop-eggs/
