@@ -213,3 +213,4 @@ evaluator.evaluate()
 evaluator.accumulate()
 evaluator.summarize()
 print("mAP metric:", float(evaluator.stats[0]))
+
