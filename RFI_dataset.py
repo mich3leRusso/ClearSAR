@@ -48,6 +48,7 @@ class RFIDataset(Dataset):
         target = self.targets[idx] if self.targets is not None else None
         if self.transforms:
             img = self.transforms(img)
+        print(img.shape)
         return img, target, self.images[idx]
 
     def __len__(self) -> int:
@@ -58,3 +59,11 @@ class RFIDataset(Dataset):
             int: Number of images in the dataset.
         """
         return len(self.images)
+
+    def n_images_w_boxes(self):
+        """
+        Count the number of images with bounding boxes.
+        """
+        if self.targets is None:
+            raise ValueError("Targets are not available for counting.")
+        return sum(1 for target in self.targets if target["boxes"].numel() > 0)
