@@ -2,9 +2,11 @@ from argparse import ArgumentParser, Namespace
 import yaml
 from typing import Any
 from ultralytics import YOLO
+from pathlib import Path
+import json
 
 
-def parse_args() -> tuple[str, str]:
+def parse_args() -> tuple[str, str, str]:
     """
     Parses the command line arguments to retrieve the mode and path to the YAML configuration file.
     :return: A tuple containing the mode and the path to the YAML configuration file.
@@ -12,9 +14,10 @@ def parse_args() -> tuple[str, str]:
     parser = ArgumentParser(description="Parse mode and YAML configuration file for running the experiment.")
     parser.add_argument("--mode", type=str, required=True, choices=["train", "eval", "inference"], help="Mode to run the experiment in (train/eval/inference).")
     parser.add_argument("--config", type=str, required=True, help="Path to the YAML configuration file.")
+    parser.add_argument("--pred_path", type=str, required=False, help="Path where to save JSON of results (for predict).")
     args: Namespace = parser.parse_args()
 
-    return args.mode, args.config
+    return args.mode, args.config, args.pred_path
 
 
 def read_yaml_config(yaml_file: str) -> dict[str, Any]:
@@ -67,7 +70,7 @@ def eval(config_file_path: str) -> None:
     model.val(**eval_args)
 
 
-def inference(config_file_path: str) -> None:
+def inference(config_file_path: str, output_path: str) -> None:
     
     # Read YAML config file and transform it into a dict
     inference_args = read_yaml_config(config_file_path)
@@ -85,28 +88,28 @@ def inference(config_file_path: str) -> None:
     # ---------------
 
     # Convert predictions to COCO detection format
-    #detections = []
-    #for result in results:
-    #    # Extract image_id from the filename stem (e.g. "1260.png" → 1260)
-    #    image_id = int(Path(result.path).stem)
-    #
-    #    boxes  = result.boxes.xyxy.cpu()   # [x_min, y_min, x_max, y_max]
-    #    scores = result.boxes.conf.cpu()
-    #    for box, score in zip(boxes, scores):
-    #        x_min, y_min, x_max, y_max = box
-    #        # Convert to COCO [x, y, w, h] format
-    #        coco_box = [x_min, y_min, x_max - x_min, y_max - y_min]
-    #        detections.append({
-    #            "image_id": image_id,
-    #            "category_id": 1,
-    #            "bbox": list(map(float, coco_box)),
-    #            "score": float(score),
-    #        })
-    #
-    #with open(output_path, "w") as f:
-    #    json.dump(detections, f)
-    #
-    #print(f"Saved {len(detections)} detections to {output_path}")
+    detections = []
+    for result in results:
+        # Extract image_id from the filename stem (e.g. "1260.png" → 1260)
+        image_id = int(Path(result.path).stem)
+    
+        boxes  = result.boxes.xyxy.cpu()   # [x_min, y_min, x_max, y_max]
+        scores = result.boxes.conf.cpu()
+        for box, score in zip(boxes, scores):
+            x_min, y_min, x_max, y_max = box
+            # Convert to COCO [x, y, w, h] format
+            coco_box = [x_min, y_min, x_max - x_min, y_max - y_min]
+            detections.append({
+                "image_id": image_id,
+                "category_id": 1,
+                "bbox": list(map(float, coco_box)),
+                "score": float(score),
+            })
+    
+    with open(output_path, "w") as f:
+        json.dump(detections, f)
+    
+    print(f"Saved {len(detections)} detections to {output_path}")
 
 
 
@@ -116,10 +119,12 @@ def to_subsmission():
 
 if __name__ == "__main__":
     # Parse the config file from command line
-    mode, config_file_path = parse_args()
+    mode, config_file_path, pred_path = parse_args()
     if mode == "train":
         train(config_file_path)
     elif mode == "eval":
         eval(config_file_path)
     elif mode == "inference":
-        inference(config_file_path) 
+        if not pred_path.endswith(".json"):
+            raise ValueError("preditions path must be saved to a '.json' file")
+        inference(config_file_path, pred_path) 

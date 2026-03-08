@@ -62,7 +62,7 @@ visualize: false
 
 # bool: Enable test-time augmentation (TTA) during inference.
 # Improves detection robustness by augmenting inputs, at the cost of slower inference.
-augment: true
+augment: false
 
 # bool: Enable class-agnostic Non-Maximum Suppression (NMS).
 # Treats all classes equally during NMS, merging overlapping boxes regardless of class.
