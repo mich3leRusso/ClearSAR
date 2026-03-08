@@ -90,8 +90,8 @@ def main(verbose: bool = False ):
         max_lr=1e-3,
         steps_per_epoch=len(train_dataloader),
         epochs=num_epochs,
-        pct_start=0.1,         # 10% of training for warmup
-        anneal_strategy="cos", # cosine annealing after warmup
+        pct_start=0.1,         
+        anneal_strategy="cos", 
     )
 
 
