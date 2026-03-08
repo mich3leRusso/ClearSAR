@@ -101,6 +101,7 @@ class DinoRCNN(nn.Module):
         images:  list of float tensors (C, H, W) in [0, 1]
         targets: list of dicts with 'boxes' (Nx4) and 'labels' (N,) — only during training
         """
+        
         return self.rcnn(images, targets)
 
 

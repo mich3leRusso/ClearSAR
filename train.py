@@ -41,13 +41,14 @@ def train(model , num_epochs, train_dataloader, scheduler ):
     
     for epoch in range(num_epochs):
 
-        for images, targets, _ in train_dataloader:
-            
-            scheduler.optimizer.zero_grad()
-            box , cls= model(images)
-            loss_dict = 
-            loss = sum(loss_dict.values())
-            loss.backward()
+        for images, targets in train_dataloader:
+            print(len(images))
+            input()
+            #scheduler.optimizer.zero_grad()
+            #loss_dict, l , io, io2= model(images)
+            #input("received 4")
+            #loss = sum(loss_dict.values())
+            #loss.backward()
             
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)  
             scheduler.optimizer.step()

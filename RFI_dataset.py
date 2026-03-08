@@ -35,26 +35,33 @@ class RFIDataset(Dataset):
         self.transforms = transforms
         self.verbose=verbose
 
-    def __getitem__(self, idx: int) -> tuple[Image.Image | torch.Tensor, dict | None, Path]:
-        """
-        Get an image, its target annotations, and file path by index.
-
-        Args:
-            idx (int): Index of the sample to retrieve.
-
-        Returns:
-            tuple: A tuple containing:
-                - img (PIL.Image or Tensor): The image, optionally transformed.
-                - target (dict or None): Dictionary with 'boxes' and 'labels' tensors, or None if targets not provided.
-                - img_path (Path): Path to the image file.
-        """
+    def __getitem__(self, idx):
         img = Image.open(self.images[idx])
+        orig_w, orig_h = img.size  # PIL gives (W, H)
+
         target = self.targets[idx] if self.targets is not None else None
+
         if self.transforms:
-            img = self.transforms(img)
-        if self.verbose:
-            print(img.shape)
-        return img, target, self.images[idx]
+            img = self.transforms(img)  # now (C, new_H, new_W)
+
+        # Scale boxes to match resized image
+        if target is not None and target["boxes"].numel() > 0:
+            new_h, new_w = 342, 516
+            scale_x = new_w / orig_w
+            scale_y = new_h / orig_h
+
+            boxes = target["boxes"].clone()
+            boxes[:, 0] *= scale_x  # x1
+            boxes[:, 2] *= scale_x  # x2
+            boxes[:, 1] *= scale_y  # y1
+            boxes[:, 3] *= scale_y  # y2
+
+            target = {
+                "boxes":  boxes,
+                "labels": target["labels"]
+            }
+
+        return img, target
 
     def __len__(self) -> int:
         """

@@ -5,8 +5,16 @@ from RFI_dataset import RFIDataset
 from utils import show_image_with_boxes
 import torch
 from PIL import Image
-from torchvision.transforms import ToTensor
+from torchvision import transforms  
 from train import train
+
+def collate_fn(batch):
+    """
+    batch: list of (image, target, path) tuples from RFIDataset
+    Returns images as list, targets as list — as Faster R-CNN expects
+    """
+    images, targets = zip(*batch)
+    return list(images), list(targets)
 
 def main(verbose: bool = False ):
 
@@ -75,9 +83,13 @@ def main(verbose: bool = False ):
     assert len(train_list) == len(targets_list)  # Sanity check: one target per image
     
     #create dataset and dataloader
+    transform = transforms.Compose([
+        transforms.Resize((342, 516)),   # (H, W)
+        transforms.ToTensor(),           
+    ])
     
-    train_dataset = RFIDataset(train_list, targets_list, ToTensor())
-    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_dataset = RFIDataset(train_list, targets_list, transform)
+    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
     
     print(f"Number of images in train dataloader: {len(train_dataset)}")
     print(f"Number of images with boxes in train dataloader: {train_dataset.n_images_w_boxes()}")
@@ -93,8 +105,8 @@ def main(verbose: bool = False ):
         pct_start=0.1,         
         anneal_strategy="cos", 
     )
-
-
+    print("*"*20, "Training Dino", "*"*20)
+    train(model, 1, train_dataloader, scheduler)
 
     return
 
