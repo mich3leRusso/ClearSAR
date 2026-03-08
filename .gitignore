@@ -19,6 +19,7 @@ configs/
 *.json
 *.png
 *.toml
+*.zip
 .python-version
 *.packaging
 *.lock
