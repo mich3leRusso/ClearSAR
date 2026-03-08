@@ -36,6 +36,8 @@ class RFIDataset(Dataset):
         self.verbose=verbose
 
     def __getitem__(self, idx):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
         img = Image.open(self.images[idx])
         orig_w, orig_h = img.size  # PIL gives (W, H)
 
@@ -60,8 +62,8 @@ class RFIDataset(Dataset):
                 "boxes":  boxes,
                 "labels": target["labels"]
             }
-
-        return img, target
+        
+        return img.to(device), target
 
     def __len__(self) -> int:
         """

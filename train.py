@@ -42,10 +42,9 @@ def train(model , num_epochs, train_dataloader, scheduler ):
     for epoch in range(num_epochs):
 
         for images, targets in train_dataloader:
-            print(len(images))
-            input()
-            #scheduler.optimizer.zero_grad()
-            #loss_dict, l , io, io2= model(images)
+
+            scheduler.optimizer.zero_grad()
+            loss_dict, l , io, io2= model(images, targets)
             #input("received 4")
             #loss = sum(loss_dict.values())
             #loss.backward()
