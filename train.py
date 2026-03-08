@@ -35,23 +35,23 @@ def detection_loss(cls_logits, predicted_boxes, gt_boxes, gt_labels):
     total_loss = cls_loss + smooth_l1 + 2.0 * giou  # upweight GIoU
     return total_loss, {"cls": cls_loss, "smooth_l1": smooth_l1, "giou": giou}
 
-def train(model , dataloader, optimizer, device):
+def train(model , num_epochs, train_dataloader, scheduler ):
 
     model.train()
-    total_loss = 0.0
-    for images, targets in dataloader:
-        images = [img.to(device) for img in images]
-        gt_boxes = torch.stack([t["boxes"].to(device) for t in targets])
-        gt_labels = torch.stack([t["labels"].to(device) for t in targets])
+    
+    for epoch in range(num_epochs):
 
-        cls_logits, predicted_boxes = model(images)
-        loss, loss_dict = detection_loss(cls_logits, predicted_boxes, gt_boxes, gt_labels)
+        for images, targets, _ in train_dataloader:
+            
+            scheduler.optimizer.zero_grad()
+            box , cls= model(images)
+            loss_dict = 
+            loss = sum(loss_dict.values())
+            loss.backward()
+            
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)  
+            scheduler.optimizer.step()
+            scheduler.step()  
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.item()
-
-    avg_loss = total_loss / len(dataloader)
-    print(f"Average training loss: {avg_loss:.4f}")
+    # For ReduceLROnPlateau, step with val loss instead:
+    # scheduler.step(val_loss)

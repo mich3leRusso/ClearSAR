@@ -6,6 +6,8 @@ from torchvision.models.detection.rpn import AnchorGenerator
 from torchvision.models.detection.backbone_utils import BackboneWithFPN
 from torchvision.ops import FeaturePyramidNetwork
 from transformers import AutoImageProcessor, AutoModel
+from PIL import Image
+import requests
 
 
 class DINOv3BackboneWrapper(nn.Module):
@@ -104,8 +106,6 @@ class DinoRCNN(nn.Module):
 
 # --- Usage ---
 if __name__ == "__main__":
-    from PIL import Image
-    import requests
 
     model = DinoRCNN(num_classes=1, freeze_backbone=True)
     model.eval()

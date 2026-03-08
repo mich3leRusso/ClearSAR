@@ -6,6 +6,8 @@ from utils import show_image_with_boxes
 import torch
 from PIL import Image
 from torchvision.transforms import ToTensor
+from train import train
+
 def main(verbose: bool = False ):
 
     #open dataset and create dataloader
@@ -75,16 +77,22 @@ def main(verbose: bool = False ):
     #create dataset and dataloader
     
     train_dataset = RFIDataset(train_list, targets_list, ToTensor())
-    print(train_dataset[0])  # Check the first sample to verify loading
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    
     print(f"Number of images in train dataloader: {len(train_dataset)}")
     print(f"Number of images with boxes in train dataloader: {train_dataset.n_images_w_boxes()}")
 
+    model = DinoRCNN(num_classes=2, freeze_backbone=True).to(device) 
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-4)
 
-    #create an optimizer and a loss function
-    #model = DinoRCNN(num_classes=1, freeze_backbone=True).to(device)
-    #optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    #criterion = torch.nn.MSELoss()
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(
+        optimizer,
+        max_lr=1e-3,
+        steps_per_epoch=len(train_dataloader),
+        epochs=num_epochs,
+        pct_start=0.1,         # 10% of training for warmup
+        anneal_strategy="cos", # cosine annealing after warmup
+    )
 
 
 
