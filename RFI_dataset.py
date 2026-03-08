@@ -16,7 +16,8 @@ class RFIDataset(Dataset):
             self,
             images: list[Path],
             targets: list[dict[str, torch.Tensor]] | None=None,
-            transforms: Callable[[Any], Any] | None=None
+            transforms: Callable[[Any], Any] | None=None, 
+            verbose: bool =False
         ):
         """
         Initialize the RFIDataset.
@@ -26,10 +27,13 @@ class RFIDataset(Dataset):
             targets (list, optional): List of target dictionaries containing 'boxes' and 'labels' tensors.
                                      If None, the dataset operates in inference mode. Defaults to None.
             transforms (callable, optional): Optional image transformation function to apply. Defaults to None.
+            verbose , if you wanna have more visualizations
         """
+
         self.images = images
         self.targets = targets
         self.transforms = transforms
+        self.verbose=verbose
 
     def __getitem__(self, idx: int) -> tuple[Image.Image | torch.Tensor, dict | None, Path]:
         """
@@ -48,7 +52,8 @@ class RFIDataset(Dataset):
         target = self.targets[idx] if self.targets is not None else None
         if self.transforms:
             img = self.transforms(img)
-        print(img.shape)
+        if self.verbose:
+            print(img.shape)
         return img, target, self.images[idx]
 
     def __len__(self) -> int:

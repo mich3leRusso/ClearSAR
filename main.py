@@ -45,8 +45,7 @@ def main(verbose: bool = False ):
 
     targets_list = []
     train_list = []
-    counter = 0
-
+    
     for img_fname in train_dir.iterdir():
         img_id = int(img_fname.stem)
         boxes = [a["bbox"] for a in annot if a["image_id"] == img_id]
@@ -58,7 +57,6 @@ def main(verbose: bool = False ):
                 "boxes":  torch.zeros((0, 4), dtype=torch.float32),  # ✅ empty, correct shape
                 "labels": torch.zeros((0,), dtype=torch.int64)
             })
-            counter += 1
 
             continue
 
