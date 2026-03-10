@@ -1,6 +1,9 @@
 import torch
 import torch.nn.functional as F
 from torchvision.ops import generalized_box_iou_loss, box_iou
+from transformers import  AutoImageProcessor
+from torch.optim import AdamW, lr_scheduler
+from Dino_Detection import EomtDetector
 
 def detection_loss(cls_logits, predicted_boxes, gt_boxes, gt_labels):
     """
@@ -35,23 +38,74 @@ def detection_loss(cls_logits, predicted_boxes, gt_boxes, gt_labels):
     total_loss = cls_loss + smooth_l1 + 2.0 * giou  # upweight GIoU
     return total_loss, {"cls": cls_loss, "smooth_l1": smooth_l1, "giou": giou}
 
-def train(model , num_epochs, train_dataloader, scheduler ):
+def train(
+    train_loader,
+    lr: float = 1e-4, 
+    val_loader= None ,
+    num_classes:   int   = 1,
+    num_epochs:    int   = 1,
+    device:        str   = "cuda",
+    freeze_backbone: bool = True,
+    validation: bool =True, 
+    model_id: str = "tue-mps/coco_instance_eomt_large_640",
+    save_path: str = "eomt_finetuned.pt",
+):
+    processor = AutoImageProcessor.from_pretrained(model_id)
 
-    model.train()
+
+    model = EomtDetector(model_id, num_classes, freeze_backbone)
+
+    # Separate LRs: higher for heads, lower (or zero) for any unfrozen backbone
+    head_params = [p for n, p in model.named_parameters()
+                   if p.requires_grad and not n.startswith("model.model.")]
+    optimizer = AdamW(head_params, lr=lr, weight_decay=1e-4)
+    scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
+
+    if validation:
+        best_val_loss = float("inf")
     
     for epoch in range(num_epochs):
+        # ── Train ──
+        model.train()
+        train_loss = 0.0
+        for batch in train_loader:
+            pixel_values = batch["pixel_values"].to(device)
+            mask_labels  = [m.to(device) for m in batch["mask_labels"]]
+            class_labels = [c.to(device) for c in batch["class_labels"]]
 
-        for images, targets in train_dataloader:
-
-            scheduler.optimizer.zero_grad()
-            loss_dict, l , io, io2= model(images, targets)
-            #input("received 4")
-            #loss = sum(loss_dict.values())
-            #loss.backward()
+            outputs = model(pixel_values, mask_labels, class_labels)
             
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)  
-            scheduler.optimizer.step()
-            scheduler.step()  
+            loss = outputs.loss  # Hungarian-matched: CE + mask BCE + dice
 
-    # For ReduceLROnPlateau, step with val loss instead:
-    # scheduler.step(val_loss)
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            optimizer.step()
+            train_loss += loss.item()
+
+        scheduler.step()
+
+        # ── Validate ──
+        if validation:
+
+            model.eval()
+            val_loss = 0.0
+            with torch.no_grad():
+                for batch in val_loader:
+                    pixel_values = batch["pixel_values"].to(device)
+                    mask_labels  = [m.to(device) for m in batch["mask_labels"]]
+                    class_labels = [c.to(device) for c in batch["class_labels"]]
+                    outputs = model(pixel_values, mask_labels, class_labels)
+                    val_loss += outputs.loss.item()
+
+            avg_train = train_loss / len(train_loader)
+            avg_val   = val_loss   / len(val_loader)
+            print(f"Epoch {epoch+1}/{num_epochs} | train_loss={avg_train:.4f} | val_loss={avg_val:.4f}")
+
+            if avg_val < best_val_loss:
+                best_val_loss = avg_val
+                torch.save(model.state_dict(), save_path)
+                print(f"  ✓ Saved best model → {save_path}")
+
+
+    return model

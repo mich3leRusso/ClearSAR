@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from Dino_Detection import DinoRCNN
+from Dino_Detection import EomtDetector
 from RFI_dataset import RFIDataset
 from utils import show_image_with_boxes
 import torch
@@ -10,11 +10,32 @@ from train import train
 
 def collate_fn(batch):
     """
-    batch: list of (image, target, path) tuples from RFIDataset
-    Returns images as list, targets as list — as Faster R-CNN expects
+    Converts (image, target) pairs from RFIDataset into EoMT-ready batches.
     """
-    images, targets = zip(*batch)
-    return list(images), list(targets)
+    pixel_values, mask_labels_list, class_labels_list = [], [], []
+
+    for img, target in batch:
+        pixel_values.append(img)
+
+        if target is not None and target["boxes"].numel() > 0:
+            masks, classes = RFIDataset.boxes_to_masks(
+                target["boxes"],
+                target["labels"],
+            )
+        else:
+            # No annotations: empty masks (EoMT handles no-object via queries)
+            masks   = torch.zeros((0, 342, 516), dtype=torch.float32)
+            classes = torch.zeros((0,),          dtype=torch.long)
+
+        mask_labels_list.append(masks)
+        class_labels_list.append(classes)
+
+    return {
+        "pixel_values": torch.stack(pixel_values),
+        "mask_labels":  mask_labels_list,   # list of (N_i, H, W) — variable N
+        "class_labels": class_labels_list,  # list of (N_i,)
+    }
+
 
 def main(verbose: bool = False ):
 
@@ -31,7 +52,7 @@ def main(verbose: bool = False ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_epochs = 3
     num_iter = 20
-    batch_size = 8
+    batch_size = 1
 
     # Random seed for reproducibility of experiments
     seed = 0
@@ -84,29 +105,20 @@ def main(verbose: bool = False ):
     
     #create dataset and dataloader
     transform = transforms.Compose([
-        transforms.Resize((342, 516)),   # (H, W)
+        transforms.Resize((640, 640)),   # (H, W)
         transforms.ToTensor(),           
     ])
     
+    #controllare dataset
     train_dataset = RFIDataset(train_list, targets_list, transform)
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
-    
+
     print(f"Number of images in train dataloader: {len(train_dataset)}")
     print(f"Number of images with boxes in train dataloader: {train_dataset.n_images_w_boxes()}")
 
-    model = DinoRCNN(num_classes=2, freeze_backbone=True).to(device) 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-4)
 
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer,
-        max_lr=1e-3,
-        steps_per_epoch=len(train_dataloader),
-        epochs=num_epochs,
-        pct_start=0.1,         
-        anneal_strategy="cos", 
-    )
     print("*"*20, "Training Dino", "*"*20)
-    train(model, 1, train_dataloader, scheduler)
+    train(train_loader=train_dataloader)
 
     return
 

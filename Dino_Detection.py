@@ -1,109 +1,119 @@
 import torch
-import torch.nn as nn
 import torchvision
-from torchvision.models.detection import FasterRCNN
-from torchvision.models.detection.rpn import AnchorGenerator
-from torchvision.ops import FeaturePyramidNetwork
-from transformers import AutoImageProcessor, AutoModel
+from PIL import Image
+from transformers import EomtForUniversalSegmentation, AutoImageProcessor
+from torch import nn
 
+class EomtDetector(nn.Module):
+    """
+    Wraps EomtForUniversalSegmentation for single-class instance segmentation
+    with bounding box extraction. For 1 custom class, fine-tune from the
+    pretrained COCO checkpoint or train from the base config.
+    """
 
-class DINOv3BackboneWrapper(nn.Module):
-    """Wraps DINOv3 to extract multi-scale patch features for FPN."""
-
-    def __init__(self, backbone, out_channels: int = 256):
+    def __init__(
+        self,
+        model_id: str = "tue-mps/coco_instance_eomt_small_640",
+        num_classes: int = 1,
+        device: str = "cuda",
+        freeze_backbone: bool = True,
+    ):
         super().__init__()
-        self.backbone = backbone
-        hidden_dim = backbone.config.hidden_size
-        self.patch_size = backbone.config.patch_size  # ✅ store patch size
+        self.device = device
+        self.processor = AutoImageProcessor.from_pretrained(model_id)
+        self.model = EomtForUniversalSegmentation.from_pretrained(model_id)
 
-        self.out_channels = out_channels
-        self.projections = nn.ModuleDict({
-            "layer_3":  nn.Conv2d(hidden_dim, out_channels, kernel_size=1),
-            "layer_6":  nn.Conv2d(hidden_dim, out_channels, kernel_size=1),
-            "layer_9":  nn.Conv2d(hidden_dim, out_channels, kernel_size=1),
-            "layer_12": nn.Conv2d(hidden_dim, out_channels, kernel_size=1),
-        })
-
-    def forward(self, x: torch.Tensor):
-        outputs = self.backbone(
-            pixel_values=x,
-            output_hidden_states=True
-        )
-        hidden_states = outputs.hidden_states
-
-        B, C_in, H_img, W_img = x.shape
-
-        # ✅ Compute actual patch grid from image dimensions (handles non-square images)
-        H = H_img // self.patch_size
-        W = W_img // self.patch_size
-
-        feature_map = {}
-        for key, layer_idx in [("layer_3", 3), ("layer_6", 6), ("layer_9", 9), ("layer_12", 12)]:
-            tokens = hidden_states[layer_idx][:, 1:, :]              # drop CLS (B, H*W, C)
-            spatial = tokens.permute(0, 2, 1).reshape(B, -1, H, W)  # (B, C, H, W)
-            feature_map[key] = self.projections[key](spatial)
-
-        return feature_map
-
-
-class DinoRCNN(nn.Module):
-
-    def __init__(self, num_classes: int = 2, freeze_backbone: bool = True):
-        # ✅ num_classes=2: 0=background, 1=RFI — never pass 1, FasterRCNN reserves 0
-        super().__init__()
-
-        pretrained_model_name = "facebook/dinov3-vits16plus-pretrain-lvd1689m"
-        self.processor = AutoImageProcessor.from_pretrained(pretrained_model_name)
-
-        dino_backbone = AutoModel.from_pretrained(
-            pretrained_model_name,
-            device_map="cpu",  # ✅ let FasterRCNN handle device placement, not HF
-        )
-
+        # Optionally freeze the ViT backbone, train only the query/mask head
         if freeze_backbone:
-            for param in dino_backbone.parameters():
-                param.requires_grad = False
+            for name, param in self.model.named_parameters():
+                if "model" in name:  # ViT backbone layers
+                    param.requires_grad = False
 
-        self.backbone_wrapper = DINOv3BackboneWrapper(dino_backbone, out_channels=256)
-        self.backbone_wrapper.out_channels = 256
-
-        anchor_generator = AnchorGenerator(
-            sizes=((32,), (64,), (128,), (256,)),          # ✅ 4 sizes for 4 feature maps
-            aspect_ratios=((0.5, 1.0, 2.0),) * 4,
+        # Replace the classifier head for num_classes + 1 (background/no-object)
+        # EomtConfig exposes hidden_size; the final classifier is a Linear layer
+        hidden_size = self.model.config.hidden_size
+        self.model.class_predictor = torch.nn.Linear(
+            hidden_size, num_classes + 1  # +1 for "no object"
         )
 
-        roi_pooler = torchvision.ops.MultiScaleRoIAlign(
-            featmap_names=["layer_3", "layer_6", "layer_9", "layer_12"],
-            output_size=7,
-            sampling_ratio=2,
+        # ✅ Reset the criterion's class weight to match new num_classes
+        # no_object class gets lower weight (0.1) as in the original EoMT paper
+        empty_weight = torch.ones(num_classes + 1)
+        empty_weight[-1] = 0.1  # last index = no-object class
+        self.model.criterion.empty_weight = empty_weight
+        self.model.criterion.num_classes = num_classes
+        
+        self.model.to("cuda")
+
+    
+    def forward(self, pixel_values, mask_labels=None,class_labels=None):
+        pixel_values = pixel_values.to(next(self.parameters()).device)
+        
+        if mask_labels is not None:
+            mask_labels  = [m.to(next(self.parameters()).device) for m in mask_labels]
+            class_labels = [c.to(next(self.parameters()).device) for c in class_labels]
+
+
+        return self.model(
+            pixel_values=pixel_values,
+            mask_labels=mask_labels, 
+            class_labels=class_labels
         )
 
-        self.rcnn = FasterRCNN(
-            backbone=self.backbone_wrapper,
-            num_classes=num_classes,
-            rpn_anchor_generator=anchor_generator,
-            box_roi_pool=roi_pooler,
-        )
 
-    def forward(self, images, targets=None):
-        return self.rcnn(images, targets)
+    def predict(self, images: list, threshold: float = 0.5):
+        """Run inference and return instance segmentation results."""
+        target_sizes = [(img.height, img.width) for img in images]
+        outputs = self.forward(images)
+
+        results = self.processor.post_process_instance_segmentation(
+            outputs,
+            target_sizes=target_sizes,
+            threshold=threshold,
+        )
+        return results  # list of dicts with 'segmentation', 'segments_info'
+
+
+# --- Bounding Box Extraction Utility ---
+def masks_to_boxes(segmentation_map, segments_info):
+    """Convert EoMT instance segmentation output to bounding boxes."""
+    boxes, labels, scores = [], [], []
+    for seg in segments_info:
+        mask = segmentation_map == seg["id"]
+        if mask.sum() == 0:
+            continue
+        rows = torch.where(mask.any(dim=1))[0]
+        cols = torch.where(mask.any(dim=0))[0]
+        x1, y1 = cols[0].item(), rows[0].item()
+        x2, y2 = cols[-1].item(), rows[-1].item()
+        boxes.append([x1, y1, x2, y2])
+        labels.append(seg["label_id"])
+        scores.append(seg["score"])
+    return boxes, labels, scores
 
 
 # --- Usage ---
 if __name__ == "__main__":
-    model = DinoRCNN(num_classes=2, freeze_backbone=True)
-    model.eval()
-
-    to_tensor = torchvision.transforms.ToTensor()
-    img_tensor = to_tensor(
-        torchvision.io.read_image  # or just use a dummy tensor for testing
+    detector = EomtDetector(
+        model_id="tue-mps/coco_instance_eomt_large_640",
+        num_classes=1,
+        freeze_backbone=True,
+        device="cuda" if torch.cuda.is_available() else "cpu",
     )
 
-    # Quick sanity check with dummy input
-    dummy = [torch.rand(3, 342, 516)]  # matches your dataset image size
-    with torch.no_grad():
-        predictions = model(dummy)
+    # Test with a PIL image (recommended interface for EoMT processor)
+    from PIL import Image as PILImage
+    import numpy as np
 
-    print("Boxes:",  predictions[0]["boxes"].shape)
-    print("Labels:", predictions[0]["labels"].shape)
-    print("Scores:", predictions[0]["scores"].shape)
+    dummy_pil = PILImage.fromarray(
+        (np.random.rand(342, 516, 3) * 255).astype(np.uint8)
+    )
+
+    results = detector.predict([dummy_pil], threshold=0.5)
+    seg_map = results[0]["segmentation"]        # (H, W) tensor, instance IDs
+    segments = results[0]["segments_info"]      # list of dicts
+
+    boxes, labels, scores = masks_to_boxes(seg_map, segments)
+    print(f"Detected {len(boxes)} instances")
+    for b, l, s in zip(boxes, labels, scores):
+        print(f"  Box: {b}  Label: {l}  Score: {s:.3f}")
