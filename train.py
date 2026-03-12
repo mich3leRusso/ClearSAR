@@ -4,7 +4,8 @@ from torchvision.ops import generalized_box_iou_loss, box_iou
 from transformers import  AutoImageProcessor
 from torch.optim import AdamW, lr_scheduler
 from Dino_Detection import EomtDetector
-
+from torchview import draw_graph
+import graphviz
 def detection_loss(cls_logits, predicted_boxes, gt_boxes, gt_labels):
     """
     cls_logits:      (N, 2)  — background vs foreground
@@ -55,6 +56,9 @@ def train(
 
     model = EomtDetector(model_id, num_classes, freeze_backbone)
 
+    model_graph = draw_graph(model, input_size=(1, 3, 640, 640), device="cuda")
+    model_graph.visual_graph.render("model_graph", format="png", cleanup=True)
+    input()
     # Separate LRs: higher for heads, lower (or zero) for any unfrozen backbone
     head_params = [p for n, p in model.named_parameters()
                    if p.requires_grad and not n.startswith("model.model.")]

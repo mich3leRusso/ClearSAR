@@ -3,7 +3,7 @@ import torchvision
 from PIL import Image
 from transformers import EomtForUniversalSegmentation, AutoImageProcessor
 from torch import nn
-
+from torchview import draw_graph
 class EomtDetector(nn.Module):
     """
     Wraps EomtForUniversalSegmentation for single-class instance segmentation
@@ -13,7 +13,7 @@ class EomtDetector(nn.Module):
 
     def __init__(
         self,
-        model_id: str = "tue-mps/coco_instance_eomt_small_640",
+        model_id: str = "tue-mps/videomt-dinov2-small-ytvis2019",
         num_classes: int = 1,
         device: str = "cuda",
         freeze_backbone: bool = True,
@@ -21,27 +21,30 @@ class EomtDetector(nn.Module):
         super().__init__()
         self.device = device
         self.processor = AutoImageProcessor.from_pretrained(model_id)
-        self.model = EomtForUniversalSegmentation.from_pretrained(model_id)
-
+        self.model = EomtForUniversalSegmentation.from_pretrained(
+            model_id,
+            num_labels=10, # Replace 10 with your exact number of labels
+            ignore_mismatched_sizes=True
+        )
         # Optionally freeze the ViT backbone, train only the query/mask head
         if freeze_backbone:
             for name, param in self.model.named_parameters():
                 if "model" in name:  # ViT backbone layers
                     param.requires_grad = False
 
-        # Replace the classifier head for num_classes + 1 (background/no-object)
+        # # Replace the classifier head for num_classes + 1 (background/no-object)
         # EomtConfig exposes hidden_size; the final classifier is a Linear layer
-        hidden_size = self.model.config.hidden_size
-        self.model.class_predictor = torch.nn.Linear(
-            hidden_size, num_classes + 1  # +1 for "no object"
-        )
+        #hidden_size = self.model.config.hidden_size
+        #self.model.class_predictor = torch.nn.Linear(
+        #    hidden_size, num_classes + 1  # +1 for "no object"
+        #)
 
         # ✅ Reset the criterion's class weight to match new num_classes
         # no_object class gets lower weight (0.1) as in the original EoMT paper
-        empty_weight = torch.ones(num_classes + 1)
-        empty_weight[-1] = 0.1  # last index = no-object class
-        self.model.criterion.empty_weight = empty_weight
-        self.model.criterion.num_classes = num_classes
+        #empty_weight = torch.ones(num_classes + 1)
+        #empty_weight[-1] = 0.1  # last index = no-object class
+        #self.model.criterion.empty_weight = empty_weight
+        #self.model.criterion.num_classes = num_classes
         
         self.model.to("cuda")
 
