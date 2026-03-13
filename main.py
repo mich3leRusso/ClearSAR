@@ -8,6 +8,8 @@ from PIL import Image
 from torchvision import transforms  
 from train import train
 from transformers import TrainingArguments, Trainer
+from torch.utils.data import Dataset, DataLoader
+
 def collate_fn(batch):
     """
     Converts (image, target) pairs from RFIDataset into EoMT-ready batches.
@@ -109,27 +111,24 @@ def main(verbose: bool = False ):
         transforms.ToTensor(),           
     ])
     
-    #controllare dataset
     train_dataset = RFIDataset(train_list, targets_list, transform)
-    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
 
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=lambda x: tuple(zip(*x)))
+    
+    s=set()
+    for img,target in train_loader:
+        data_dict = target[0]
+        # 2. Extract the 'labels' tensor and convert it to a Python list using .tolist()
+        labels_list = data_dict['labels'].tolist()
+        s.update(labels_list)
+        
+    print(s)
     print(f"Number of images in train dataloader: {len(train_dataset)}")
     print(f"Number of images with boxes in train dataloader: {train_dataset.n_images_w_boxes()}")
 
-    # 3. Training Arguments
-    training_args = TrainingArguments(
-        output_dir="./eomt-finetuned",
-        learning_rate=5e-5,
-        num_train_epochs=10,
-        per_device_train_batch_size=2,
-        gradient_accumulation_steps=4,
-        remove_unused_columns=False, # CRITICAL: Must be False for segmentation models
-        dataloader_num_workers=4,
-        fp16=True, # Recommended for large ViTs
-    )
-
+    
     print("*"*20, "Training Dino", "*"*20)
-    train(train_loader=train_dataloader)
+    #train(train_loader=train_dataloader)
 
     return
 
