@@ -2,12 +2,11 @@
 import json
 from pathlib import Path
 from RFI_dataset import RFIDataset
-from utils import show_image_with_boxes
+from utils.show_bbx import show_image_with_boxes
 import torch
 from PIL import Image
 from torchvision import transforms
-from transformers import TrainingArguments, Trainer
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import  DataLoader
 
 def collate_fn(batch):
 
