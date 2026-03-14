@@ -13,6 +13,86 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import json
 
+import cv2
+import numpy as np
+import torch
+from pathlib import Path
+from PIL import Image
+import random
+
+def convert2YCrCb(img_path: Path) -> np.ndarray:
+    """
+    Opens a single image and converts it from BGR to YCrCb color space.
+
+    Args:
+        img_path: Path to the image file.
+    Returns:
+        YCrCb image as uint8 numpy array [H, W, 3].
+    """
+    img_bgr = cv2.imread(str(img_path), cv2.IMREAD_COLOR)
+
+    if img_bgr is None:
+        raise FileNotFoundError(f"Image not found or unreadable: {img_path}")
+
+    return cv2.cvtColor(img_bgr, cv2.COLOR_BGR2YCrCb)
+
+def visualize_ycrcb_random(
+    image_paths: List[Path],
+    n_samples: int = 3,
+    seed: int = None
+) -> None:
+    """
+    Randomly samples n_samples images, converts to YCrCb,
+    and displays the original + each channel side by side.
+
+    Args:
+        image_paths: List of image paths to sample from.
+        n_samples:   Number of random images to display.
+        seed:        Optional random seed for reproducibility.
+    """
+    if seed is not None:
+        random.seed(seed)
+
+    sampled_paths = random.sample(image_paths, min(n_samples, len(image_paths)))
+    converted = convert2YCrCb(sampled_paths)
+
+    fig, axes = plt.subplots(n_samples, 5, figsize=(20, 4 * n_samples))
+
+    # Handle single-row case
+    if n_samples == 1:
+        axes = [axes]
+
+    channel_names = ["Y (Luminance)", "Cr (Red diff)", "Cb (Blue diff)"]
+    channel_cmaps = ["gray", "RdBu_r", "PuBu_r"]
+
+    for row, (img_path, img_ycrcb) in enumerate(zip(sampled_paths, converted)):
+
+        # Col 0: Original BGR rendered as RGB
+        img_bgr = cv2.imread(str(img_path), cv2.IMREAD_COLOR)
+        img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+        axes[row][0].imshow(img_rgb)
+        axes[row][0].set_title(f"Original RGB\n{img_path.name}", fontsize=9)
+        axes[row][0].axis("off")
+
+        # Col 1: Full YCrCb image (displayed as-is via imshow)
+        axes[row][1].imshow(img_ycrcb)
+        axes[row][1].set_title("YCrCb (composite)", fontsize=9)
+        axes[row][1].axis("off")
+
+        # Cols 2-4: Individual Y, Cr, Cb channels
+        for col, (ch_idx, name, cmap) in enumerate(
+            zip(range(3), channel_names, channel_cmaps), start=2
+        ):
+            axes[row][col].imshow(img_ycrcb[:, :, ch_idx], cmap=cmap)
+            axes[row][col].set_title(name, fontsize=9)
+            axes[row][col].axis("off")
+
+    plt.suptitle("YCrCb Color Space — Random Sample Visualization", fontsize=13, y=1.01)
+    plt.tight_layout()
+    #plt.savefig("ycrcb_visualization.png", dpi=150, bbox_inches="tight")
+    plt.show()
+    #print("Saved → ycrcb_visualization.png")
+
 def convert2fft(image_paths: List[Path], magnitude: bool = True) -> List[np.ndarray]:
     """
     Convert a list of images to their FFT magnitude or phase spectrum.

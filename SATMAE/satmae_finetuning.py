@@ -3,7 +3,7 @@ import torch.nn as nn
 from collections import OrderedDict
 from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.rpn import AnchorGenerator
-from model import  MaskedAutoencoderViT
+from SATMAE.model import  MaskedAutoencoderViT
 from torchview import draw_graph
 
 class SatMAE_Encoder(nn.Module):
@@ -13,17 +13,6 @@ class SatMAE_Encoder(nn.Module):
         
         self.model = MaskedAutoencoderViT.from_pretrained("MVRL/satmaepp_ViT-L_pretrain_fmow_rgb")
         
-        #SATMAE encoder 
-        #self.patch_embed = model.patch_embed
-        
-        #self.cls_token = model.cls_token
-        #self.pos_embed = self.pos_embed
-
-        #self.blocks = model.blocks
-        #self.norm = model.norm
-
-        
-        # Simple Feature Pyramid Network (FPN) neck
         # Scale 1: 1/8 resolution (upsample from 14x14 to 28x28)
         self.scale1 = nn.Sequential(
             nn.ConvTranspose2d(embed_dim, out_channels, kernel_size=2, stride=2),
@@ -42,13 +31,13 @@ class SatMAE_Encoder(nn.Module):
             nn.BatchNorm2d(out_channels),
             nn.GELU()
         )
-        # Scale 4: 1/64 resolution (downsample from 7x7 to 4x4)
+        #Scale 4 
         self.scale4 = nn.Sequential(
-            nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(out_channels),
             nn.GELU()
         )
+
 
     def forward(self, x):
         # 1. Forward pass through SatMAE encoder (ensure 0% masking for detection)
@@ -72,7 +61,7 @@ class SatMAE_Encoder(nn.Module):
         out['0'] = self.scale1(spatial_map)  # Stride 8:  [B, 256, 28, 28]
         out['1'] = self.scale2(spatial_map)  # Stride 16: [B, 256, 14, 14]
         out['2'] = self.scale3(spatial_map)  # Stride 32: [B, 256, 7, 7]
-        out['3'] = self.scale4(out['2'])     # Stride 64: [B, 256, 4, 4]
+        out['3'] = self.scale4(out['2'])
         
         return out
 
@@ -112,5 +101,6 @@ if __name__=="__main__":
     #print(model(torch.randn(2, 3, 224, 224)))
 
     model=SatMAE_RCNN()
+
     model.eval()
     print(model(torch.randn(2, 3, 224, 224)))
