@@ -54,8 +54,8 @@ def visualize_ycrcb_random(
         random.seed(seed)
 
     sampled_paths = random.sample(image_paths, min(n_samples, len(image_paths)))
-    converted = convert2YCrCb(sampled_paths)
-
+    converted = [convert2YCrCb(p) for p in sampled_paths]
+    
     fig, axes = plt.subplots(n_samples, 5, figsize=(20, 4 * n_samples))
 
     # Handle single-row case
@@ -318,9 +318,11 @@ if __name__ == "__main__":
     print(f"Images without RFI:     {sum(1 for t in targets_list if t['boxes'].numel() == 0)}")
 
     # --- Visualize ---
-    visualize_fft_with_annotations(
-        image_paths=train_list,
-        targets=targets_list,
-        max_images=4,
-        save_path=Path("fft_annotated.png")
-    )
+    #visualize_fft_with_annotations(
+    #    image_paths=train_list,
+    #    targets=targets_list,
+    #    max_images=4,
+    #    save_path=Path("fft_annotated.png")
+    #)
+
+    visualize_ycrcb_random(train_list, 7)
