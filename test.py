@@ -1,5 +1,6 @@
 from RFI_dataset import RFIDataset
-from torchvision import transforms as T
+
+from torchvision import transforms
 from torch.utils.data import DataLoader
 import torch  
 import tqdm
@@ -7,17 +8,22 @@ import json
 from PIL import Image
 from utils.show_bbx import show_image_with_boxes
 
-def evaluate_model(model, test_dir:str,  out_dir:str, batch_size : int =1, verbose:bool =False):
+def test_model(model, test_dir:str,  out_dir:str, batch_size : int =1, verbose:bool =False):
     
     test_list = list(test_dir.iterdir())
-    test_data = RFIDataset(test_list, None, transforms=T.ToTensor())
+    transformation= transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+    ])
+
+    test_data = RFIDataset(test_list, None, transforms=transformation)
     test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False, collate_fn=lambda x: tuple(zip(*x)))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     model.eval()
     
     detections = []
-    for i, (imgs, _, img_paths) in tqdm(enumerate(test_loader), total=len(test_loader)):
+    for i, (imgs, img_paths) in tqdm.tqdm(enumerate(test_loader), total=len(test_loader)):
         imgs = list(img.to(device) for img in imgs)
         with torch.no_grad():
             outputs = model(imgs)
