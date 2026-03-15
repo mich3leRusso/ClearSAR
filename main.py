@@ -12,15 +12,17 @@ from sklearn.model_selection import train_test_split
 from argparse import ArgumentParser
 from test import test_model
 from train import train_one_epoch, evaluate
+import os 
 
 def main(verbose: bool = False, validation:float= 0.0, train: bool= True, data_dir:str="ClearSAR/data"):
 
     data_dir = Path(data_dir)
     train_dir = data_dir / "images/train"
     test_dir = data_dir / "images/test"
-    out_dir= data_dir / "test_evaluation"
+    out_dir= data_dir / "test_evaluation.json"
     model_dir = Path("models")
     model_dir.mkdir(exist_ok=True)
+    
     train_labels_path = data_dir / "annotations/instances_train.json"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -141,6 +143,7 @@ def main(verbose: bool = False, validation:float= 0.0, train: bool= True, data_d
     test_model(model, test_dir=test_dir, out_dir=out_dir)
 
 
+##Add transformations 
 
 if __name__ == "__main__":
     parser=ArgumentParser()

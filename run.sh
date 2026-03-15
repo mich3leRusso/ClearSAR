@@ -7,5 +7,4 @@ cd /home/michele-russo/eotdl
 
 # Run the main script
 python main.py \
-    --train \
     --validation 0.2
