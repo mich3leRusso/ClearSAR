@@ -21,7 +21,7 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch):
     model.encoder.model.eval()
     total_loss = 0.0
 
-    for i, (images, targets) in enumerate(data_loader):
+    for i, (images, targets, _, og_img_size) in enumerate(data_loader):
         # Move images and targets to device
         images = [img.to(device) for img in images]
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]

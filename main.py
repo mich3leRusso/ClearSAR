@@ -13,6 +13,7 @@ from argparse import ArgumentParser
 from test import test_model
 from train import train_one_epoch, evaluate
 import os 
+from transformation import train_transform, val_transform
 
 def main(verbose: bool = False, validation:float= 0.0, train: bool= True, data_dir:str="ClearSAR/data"):
 
@@ -75,12 +76,7 @@ def main(verbose: bool = False, validation:float= 0.0, train: bool= True, data_d
         random_state=42
     )
 
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-    ])
-
-    train_dataset = RFIDataset(train_imgs, train_targets, transform)
+    train_dataset = RFIDataset(train_imgs, train_targets, train_transform)
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -90,7 +86,7 @@ def main(verbose: bool = False, validation:float= 0.0, train: bool= True, data_d
     )
 
     if validation>0.0:
-        val_dataset=RFIDataset(val_imgs, val_targets,transform)
+        val_dataset=RFIDataset(val_imgs, val_targets,val_transform)
         val_dataloader= DataLoader(
             val_dataset, 
             batch_size=1, 
@@ -112,6 +108,10 @@ def main(verbose: bool = False, validation:float= 0.0, train: bool= True, data_d
         eta_min=1e-6
     )
 
+    if verbose:
+        for i, (img,target) in train_loader:
+            return ############# Fix and add visualization
+
     # ── Training loop ──────────────────────────────────────────────────────
     if train:
     
@@ -120,9 +120,9 @@ def main(verbose: bool = False, validation:float= 0.0, train: bool= True, data_d
         for epoch in range(1, num_epochs + 1):
             avg_loss = train_one_epoch(model, optimizer, train_loader, device, epoch)
             scheduler.step()
+            
             avg_val_loss   = evaluate(model, val_dataloader, device)
             print(f"\n── Epoch {epoch} complete | Avg Loss: {avg_loss:.4f} | LR: {scheduler.get_last_lr()[0]:.6f}\n")
-            input()
             if avg_val_loss < best_loss:
                 best_loss = avg_loss
                 torch.save(model.state_dict(), model_dir / "satmae_rcnn_best.pth")
@@ -146,6 +146,7 @@ def main(verbose: bool = False, validation:float= 0.0, train: bool= True, data_d
 ##Add transformations 
 
 if __name__ == "__main__":
+
     parser=ArgumentParser()
     
     parser.add_argument(
@@ -154,7 +155,7 @@ if __name__ == "__main__":
         help="Enable verbose output"
     )
     parser.add_argument(
-        "--validation",  # fixed typo: valdation → validation
+        "--validation",  
         type=float,
         default=0.2,
         help="Fraction of data to use as validation set"

@@ -14,6 +14,7 @@ def show_image_with_boxes(image: Image.Image, boxes: list[list[float]]):
                                    where (x, y) is the top-left corner and (w, h) are width and height.
     """
     # Create a single subplot and show the image
+    print(image.size)
     fig, ax = plt.subplots(1)
     ax.imshow(image)
 

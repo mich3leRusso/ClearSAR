@@ -7,4 +7,5 @@ cd /home/michele-russo/eotdl
 
 # Run the main script
 python main.py \
-    --validation 0.2
+    --validation 0.2 \
+    

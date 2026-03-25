@@ -3,7 +3,7 @@ from torch.utils.data import Dataset
 from PIL import Image
 from pathlib import Path
 from typing import Callable, Any
-
+import numpy as np
 
 class RFIDataset(Dataset):
     """
@@ -28,33 +28,33 @@ class RFIDataset(Dataset):
     def __getitem__(self, idx):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        img = Image.open(self.images[idx])
-        orig_w, orig_h = img.size  # PIL gives (W, H)
+        img = np.array(Image.open(self.images[idx]).convert("RGB"))
+        orig_shape = img.shape  # (H, W, C)
 
         target = self.targets[idx] if self.targets is not None else None
 
         if self.transforms:
-            img = self.transforms(img)  # now (C, new_H, new_W)
+            if target is not None and target["boxes"].numel() > 0:
+                # Train: pass boxes and labels to Albumentations
+                boxes  = target["boxes"].numpy().tolist()
+                labels = target["labels"].numpy().tolist()
+                transformed = self.transforms(image=img, bboxes=boxes, labels=labels)
+                boxes  = transformed["bboxes"]
+                labels = transformed["labels"]
+                target = {
+                    "boxes":  torch.tensor(boxes,  dtype=torch.float32) if len(boxes) > 0
+                            else torch.zeros((0, 4), dtype=torch.float32),
+                    "labels": torch.tensor(labels, dtype=torch.int64) if len(labels) > 0
+                            else torch.zeros(0, dtype=torch.int64)
+                }
+            else:
+                # Test: no boxes, just transform the image
+                transformed = self.transforms(image=img)
 
-        # Scale boxes to match resized image
-        if target is not None and target["boxes"].numel() > 0:
-            new_h, new_w = 342, 516
-            scale_x = new_w / orig_w
-            scale_y = new_h / orig_h
+            img = transformed["image"]
 
-            boxes = target["boxes"].clone()
-            boxes[:, 0] *= scale_x  # x1
-            boxes[:, 2] *= scale_x  # x2
-            boxes[:, 1] *= scale_y  # y1
-            boxes[:, 3] *= scale_y  # y2
-
-            target = {
-                "boxes":  boxes,
-                "labels": target["labels"]
-            }
-
-        return img.to(device), target
-
+        return img.to(device), target, self.images[idx], orig_shape
+    
     def __len__(self) -> int:
         return len(self.images)
 
