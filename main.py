@@ -27,8 +27,8 @@ def main(verbose: bool = False, validation:float= 0.0, train: bool= True, data_d
     train_labels_path = data_dir / "annotations/instances_train.json"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    num_epochs = 10
-    batch_size = 2
+    num_epochs = 30
+    batch_size = 4
     seed = 0
     torch.manual_seed(seed)
 

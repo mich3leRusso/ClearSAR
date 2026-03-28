@@ -35,7 +35,6 @@ class RFIDataset(Dataset):
 
         if self.transforms:
             if target is not None and target["boxes"].numel() > 0:
-                # Train: pass boxes and labels to Albumentations
                 boxes  = target["boxes"].numpy().tolist()
                 labels = target["labels"].numpy().tolist()
                 transformed = self.transforms(image=img, bboxes=boxes, labels=labels)
@@ -48,8 +47,8 @@ class RFIDataset(Dataset):
                             else torch.zeros(0, dtype=torch.int64)
                 }
             else:
-                # Test: no boxes, just transform the image
-                transformed = self.transforms(image=img)
+                # ✅ Always pass bboxes/labels even when empty
+                transformed = self.transforms(image=img, bboxes=[], labels=[])
 
             img = transformed["image"]
 

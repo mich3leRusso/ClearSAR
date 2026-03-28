@@ -8,7 +8,7 @@ def evaluate(model, data_loader, device):
 
     total_loss = 0.0
     with torch.no_grad():
-        for images, targets in data_loader:
+        for i, (images, targets, _, og_img_size) in enumerate(data_loader):
             images  = [img.to(device) for img in images]
             targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
             loss_dict = model.detector(images, targets)

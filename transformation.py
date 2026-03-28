@@ -22,6 +22,8 @@ train_transform = A.Compose([
 ))
 val_transform = A.Compose([
     A.Resize(512, 336),
+    A.Normalize(mean=[0.485, 0.456, 0.406],  # ✅ same as train
+                std=[0.229, 0.224, 0.225]),
     ToTensorV2(),
 ], bbox_params=A.BboxParams(
     format='pascal_voc',
