@@ -14,6 +14,7 @@ from test import test_model
 from train import train_one_epoch, evaluate
 import os 
 from transformation import train_transform, val_transform
+from torch.utils.tensorboard import SummaryWriter
 
 def main(verbose: bool = False, validation:float= 0.0, train: bool= True, data_dir:str="ClearSAR/data"):
 
@@ -27,7 +28,7 @@ def main(verbose: bool = False, validation:float= 0.0, train: bool= True, data_d
     train_labels_path = data_dir / "annotations/instances_train.json"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    num_epochs = 30
+    num_epochs = 50
     batch_size = 4
     seed = 0
     torch.manual_seed(seed)
@@ -112,6 +113,7 @@ def main(verbose: bool = False, validation:float= 0.0, train: bool= True, data_d
         for i, (img,target) in train_loader:
             return ############# Fix and add visualization
 
+    os.makedirs("runs/logs", exist_ok=True )
     # ── Training loop ──────────────────────────────────────────────────────
     if train:
     
@@ -120,8 +122,10 @@ def main(verbose: bool = False, validation:float= 0.0, train: bool= True, data_d
         for epoch in range(1, num_epochs + 1):
             avg_loss = train_one_epoch(model, optimizer, train_loader, device, epoch)
             scheduler.step()
-            
+            writer= SummaryWriter(log_dir=f"runs/logs")
+            writer.add_scalar("Loss/train", avg_loss, epoch)
             avg_val_loss   = evaluate(model, val_dataloader, device)
+            writer.add_scalar("Loss/val", avg_val_loss, epoch)
             print(f"\n── Epoch {epoch} complete | Avg Loss: {avg_loss:.4f} | LR: {scheduler.get_last_lr()[0]:.6f}\n")
             if avg_val_loss < best_loss:
                 best_loss = avg_loss
