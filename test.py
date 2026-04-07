@@ -11,8 +11,9 @@ from transformation import test_transform
 
 
 def test_model(model, test_dir: str, out_dir: str, batch_size: int = 1,
-               verbose: bool = False, save_images: bool = True,
-               score_threshold: float = 0.3):
+                save_images: bool = True,
+               score_threshold: float = 0.5
+               ):
 
     test_list = list(sorted(test_dir.glob("*.png")))
 
@@ -63,16 +64,20 @@ def test_model(model, test_dir: str, out_dir: str, batch_size: int = 1,
                 detections.append(det)
                 img_detections.append(det)
 
-            # ── Save image with boxes ──────────────────────────────────────
             if save_images:
-                filtered_boxes = [
-                    det["bbox"] for det in img_detections
-                    if det["score"] >= score_threshold
-                ]
-                pil_img = Image.open(img_path)
-                annotated = show_image_with_boxes(pil_img, filtered_boxes, return_image=True)
-                save_path = img_out_dir / img_path.name
-                annotated.save(save_path)
+                filtered = [(det["bbox"], det["score"]) for det in img_detections
+                            if det["score"] >= score_threshold]
+                filtered_boxes  = [f[0] for f in filtered]
+                filtered_scores = [f[1] for f in filtered]
+
+                pil_img  = Image.open(img_path)
+                annotated = show_image_with_boxes(
+                    pil_img, filtered_boxes,
+                    scores=filtered_scores,
+                    show_label=True,       # ← toggle label on/off here
+                    return_image=True
+                )
+                annotated.save(img_out_dir / img_path.name)
 
     with open(out_dir, "w") as f:
         json.dump(detections, f)
