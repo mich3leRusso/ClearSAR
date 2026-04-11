@@ -14,11 +14,88 @@ import matplotlib.gridspec as gridspec
 import json
 
 import cv2
-import numpy as np
 import torch
 from pathlib import Path
 from PIL import Image
 import random
+
+import os
+from pathlib import Path
+from PIL import Image
+import cv2
+from scipy.ndimage import uniform_filter
+
+
+
+
+
+from PIL import Image
+import numpy as np
+import cv2
+from pathlib import Path
+import os
+
+
+def remove_vertical_stripes(
+    image_path: str | Path,
+    output_folder: str | Path,
+    smooth_window: int = 51,
+    strength: float = 1.0,
+    preserve_brightness: bool = True,
+) -> str:
+    """
+    Remove vertical stripe / banding artifacts from an RGB image.
+
+    Method:
+    1. For each channel, compute the column-wise mean profile.
+    2. Smooth that profile to estimate the low-frequency illumination trend.
+    3. Subtract the residual column bias (stripe component) from each column.
+
+    Args:
+        image_path: Input RGB image path.
+        output_folder: Folder where output image will be saved.
+        smooth_window: Odd Gaussian smoothing window across columns.
+            Larger values remove only broad column bias; smaller values remove
+            finer stripes. Good starting range: 31-101.
+        strength: Correction strength. 1.0 = full correction,
+            0.5 = gentler correction.
+        preserve_brightness: Re-center output to preserve global channel means.
+
+    Returns:
+        Path to saved destriped image.
+    """
+    os.makedirs(output_folder, exist_ok=True)
+    img = Image.open(image_path).convert('RGB')
+    arr = np.asarray(img).astype(np.float32)
+
+    if smooth_window % 2 == 0:
+        smooth_window += 1
+
+    out = np.empty_like(arr)
+
+    for c in range(3):
+        ch = arr[:, :, c]
+        col_profile = ch.mean(axis=0)
+        trend = cv2.GaussianBlur(
+            col_profile.reshape(1, -1),
+            (smooth_window, 1),
+            0
+        ).reshape(-1)
+        stripe_component = col_profile - trend
+        corrected = ch - strength * stripe_component[None, :]
+        out[:, :, c] = corrected
+
+    if preserve_brightness:
+        in_mean = arr.mean(axis=(0, 1), keepdims=True)
+        out_mean = out.mean(axis=(0, 1), keepdims=True)
+        out += (in_mean - out_mean)
+
+    out = np.clip(out, 0, 255).astype(np.uint8)
+
+    stem = Path(image_path).stem
+    out_path = os.path.join(output_folder, f"{stem}_destriped.png")
+    Image.fromarray(out).save(out_path)
+    return out_path
 
 def convert2YCrCb(img_path: Path) -> np.ndarray:
     """
@@ -281,6 +358,142 @@ def show_image_with_boxes(image: Image.Image, boxes: list[list[float]]):
     plt.axis('off')
     plt.show()
 
+
+
+def apply_clahe(
+    image_path: str,
+    output_folder: str,
+    clip_limit: float = 2.0,
+    tile_grid_size: tuple = (8, 8)
+) -> str:
+    """
+    Apply CLAHE to the L channel of a LAB-converted RGB image.
+
+    Converts the image to CIE LAB color space and applies Contrast Limited
+    Adaptive Histogram Equalization (CLAHE) only on the L (luminance) channel,
+    leaving hue and saturation untouched. This boosts local contrast and makes
+    object boundaries more visible to YOLO without introducing color artifacts.
+
+    Args:
+        image_path:      Path to the input RGB image.
+        output_folder:   Folder where the preprocessed image will be saved.
+        clip_limit:      Contrast limiting threshold (default 2.0).
+                         Higher values → more contrast boost but also more
+                         noise amplification. Keep between 1.5 and 4.0
+                         for SAR images.
+        tile_grid_size:  Grid size for local histogram equalization
+                         (default (8, 8)). Smaller tiles → more localized
+                         enhancement, useful for small objects.
+
+    Returns:
+        str: Absolute path to the saved output image.
+
+    Example:
+        >>> out = apply_clahe("scene.png", "./preprocessed", clip_limit=2.5)
+        >>> print(out)  # ./preprocessed/scene_clahe.png
+    """
+    os.makedirs(output_folder, exist_ok=True)
+
+    # Load with Pillow, ensure RGB
+    pil_img = Image.open(image_path).convert("RGB")
+    img_np = np.array(pil_img, dtype=np.uint8)
+
+    # Convert RGB → LAB (OpenCV uses BGR internally, but input is already uint8 RGB)
+    img_lab = cv2.cvtColor(img_np, cv2.COLOR_RGB2LAB)
+
+    # Apply CLAHE only to the L channel (index 0 in LAB)
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
+    img_lab[:, :, 0] = clahe.apply(img_lab[:, :, 0])
+
+    # Convert LAB → RGB
+    img_out = cv2.cvtColor(img_lab, cv2.COLOR_LAB2RGB)
+
+    stem = Path(image_path).stem
+    out_path = os.path.join(output_folder, f"{stem}_clahe.png")
+    Image.fromarray(img_out).save(out_path)
+    return out_path
+
+
+def apply_lee_filter(
+    image_path: str,
+    output_folder: str,
+    window_size: int = 7,
+    looks: float = 1.0
+) -> str:
+    """
+    Apply the Lee speckle filter to an RGB image (processed per channel).
+
+    The Lee filter is the standard adaptive despeckling approach for SAR.
+    It models SAR noise as multiplicative and adapts per-pixel based on the
+    local signal-to-noise ratio:
+
+        filtered = mean + W * (pixel - mean)
+        W        = local_var / (local_var + noise_var)
+        noise_var = mean² / ENL
+
+    - In flat/homogeneous regions: W → 0  → output ≈ local mean (smooth)
+    - In edges/targets:            W → 1  → output ≈ original  (sharp)
+
+    This preserves object edges (important for tight bounding boxes) while
+    suppressing speckle and RFI noise in the background.
+
+    Args:
+        image_path:    Path to the input RGB image.
+        output_folder: Folder where the preprocessed image will be saved.
+        window_size:   Local window size in pixels (default 7, must be odd).
+                       Larger window → more smoothing and noise reduction,
+                       but slight edge blurring. Typical range: 5–15.
+        looks:         Equivalent Number of Looks (ENL). Represents the
+                       effective number of independent looks in the SAR
+                       image, which controls the assumed noise level:
+                         - Lower ENL (1.0) → preserve more texture
+                         - Higher ENL (4–9) → stronger smoothing
+                       Estimate from a homogeneous region: ENL = mean²/variance.
+
+    Returns:
+        str: Absolute path to the saved output image.
+
+    Example:
+        >>> out = apply_lee_filter("scene.png", "./preprocessed",
+        ...                        window_size=7, looks=2.0)
+        >>> print(out)  # ./preprocessed/scene_lee_filter.png
+    """
+    os.makedirs(output_folder, exist_ok=True)
+
+    pil_img = Image.open(image_path).convert("RGB")
+    img_np = np.array(pil_img, dtype=np.float32)
+
+    output = np.zeros_like(img_np)
+
+    for c in range(3):
+        channel = img_np[:, :, c]
+
+        # Local statistics via box filter
+        local_mean    = uniform_filter(channel, size=window_size)
+        local_sq_mean = uniform_filter(channel ** 2, size=window_size)
+
+        # Local variance (clamp to 0 for numerical stability)
+        local_var = np.maximum(local_sq_mean - local_mean ** 2, 0.0)
+
+        # Noise variance from multiplicative SAR model: sigma_n² = mean² / ENL
+        noise_var = (local_mean ** 2) / max(looks, 1e-6)
+
+        # Lee adaptive weighting
+        weight = local_var / (local_var + noise_var + 1e-8)
+
+        # Final filtered value
+        output[:, :, c] = local_mean + weight * (channel - local_mean)
+
+    output = np.clip(output, 0, 255).astype(np.uint8)
+
+    stem = Path(image_path).stem
+    out_path = os.path.join(output_folder, f"{stem}_lee_filter.png")
+    Image.fromarray(output).save(out_path)
+    return out_path
+
+
+
+
 if __name__ == "__main__":
 
     with open("ClearSAR/data/annotations/instances_train.json") as f:
@@ -288,6 +501,8 @@ if __name__ == "__main__":
         annot = gt["annotations"]
 
     train_dir = Path("ClearSAR/data/images/train")
+    out_folder = Path("ClearSAR/data/images/train_preprocessed")
+
     train_list = []
     targets_list = []
 
@@ -295,12 +510,12 @@ if __name__ == "__main__":
         img_id = int(img_fname.stem)
         boxes = [a["bbox"] for a in annot if a["image_id"] == img_id]
 
-        train_list.append(img_fname)  # always append — include empty images too
+        train_list.append(img_fname)
 
         if boxes == []:
             targets_list.append({
-                "boxes":  torch.zeros((0, 4), dtype=torch.float32),
-                "labels": torch.zeros((0,),   dtype=torch.int64)
+                "boxes": torch.zeros((0, 4), dtype=torch.float32),
+                "labels": torch.zeros((0,), dtype=torch.int64)
             })
         else:
             xyxy_boxes = []
@@ -309,7 +524,7 @@ if __name__ == "__main__":
                 xyxy_boxes.append([x_min, y_min, x_min + w, y_min + h])
 
             targets_list.append({
-                "boxes":  torch.tensor(xyxy_boxes, dtype=torch.float32),
+                "boxes": torch.tensor(xyxy_boxes, dtype=torch.float32),
                 "labels": torch.tensor([1] * len(xyxy_boxes), dtype=torch.int64)
             })
 
@@ -317,12 +532,10 @@ if __name__ == "__main__":
     print(f"Images with RFI boxes:  {sum(1 for t in targets_list if t['boxes'].numel() > 0)}")
     print(f"Images without RFI:     {sum(1 for t in targets_list if t['boxes'].numel() == 0)}")
 
-    # --- Visualize ---
-    #visualize_fft_with_annotations(
-    #    image_paths=train_list,
-    #    targets=targets_list,
-    #    max_images=4,
-    #    save_path=Path("fft_annotated.png")
-    #)
-
-    visualize_ycrcb_random(train_list, 7)
+ #   visualize_ycrcb_random(train_list, 7)
+    #best setting
+    for img_path in train_list:
+        p1 = remove_vertical_stripes(img_path, out_folder / "denoising2" / "destriped", smooth_window=51, strength=1.0)
+        #p2 = apply_lee_filter(p1, out_folder / "denoising" / "lee", window_size=3, looks=4.0)
+        p3 = apply_clahe(p1, out_folder / "denoising2" / "clahe", clip_limit=2.0, tile_grid_size=(8, 8))
+        print(f"Done: {img_path.name}")
